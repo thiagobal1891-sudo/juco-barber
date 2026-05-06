@@ -48,11 +48,47 @@ export class BookingsService {
 
     const startTime = dayjs(dto.startTime);
     const endTime = startTime.add(service.durationMinutes, 'minute');
+    const dayOfWeek = startTime.day();
 
-    // Check availability
+    // 1. Check Working Hours
+    const workingHours = await this.prisma.workingHours.findFirst({
+      where: { dayOfWeek, isActive: true },
+    });
+
+    if (!workingHours) {
+      throw new ConflictException('The barbershop is closed on this day');
+    }
+
+    const [startH, startM] = workingHours.startTime.split(':').map(Number);
+    const [endH, endM] = workingHours.endTime.split(':').map(Number);
+    const workStart = startTime.startOf('day').set('hour', startH).set('minute', startM);
+    const workEnd = startTime.startOf('day').set('hour', endH).set('minute', endM);
+
+    if (startTime.isBefore(workStart) || endTime.isAfter(workEnd)) {
+      throw new ConflictException('Selected time is outside working hours');
+    }
+
+    // 2. Check Blocked Slots
+    const blocked = await this.prisma.blockedSlot.findFirst({
+      where: {
+        OR: [
+          {
+            startTime: { lt: endTime.toDate() },
+            endTime: { gt: startTime.toDate() },
+          },
+        ],
+      },
+    });
+
+    if (blocked) {
+      throw new ConflictException('This time slot is manually blocked');
+    }
+
+    // 3. Check overlapping bookings
     const overlapping = await this.prisma.booking.findFirst({
       where: {
         barberId: dto.barberId,
+        status: { in: ['reserved', 'completed'] },
         OR: [
           {
             startTime: {
@@ -67,10 +103,11 @@ export class BookingsService {
     });
 
     if (overlapping) {
-      throw new ConflictException('Time slot is already booked for this barber');
+      throw new ConflictException('Time slot is already booked');
     }
 
     const booking = await this.prisma.booking.create({
+
       data: {
         clientName: dto.clientName,
         clientPhone: dto.clientPhone,
@@ -102,15 +139,44 @@ export class BookingsService {
   }
 
   async getAvailability(barberId: string, date: string) {
-    const startOfDay = dayjs(date).startOf('day').set('hour', 9); // 09:00
-    const endOfDay = dayjs(date).startOf('day').set('hour', 20); // 20:00
+    const selectedDate = dayjs(date);
+    const dayOfWeek = selectedDate.day();
+
+    // Fetch working hours for this day
+    const workingHours = await this.prisma.workingHours.findFirst({
+      where: { dayOfWeek, isActive: true },
+    });
+
+    if (!workingHours) {
+      return []; // Not working this day
+    }
+
+    const [startH, startM] = workingHours.startTime.split(':').map(Number);
+    const [endH, endM] = workingHours.endTime.split(':').map(Number);
+
+    const startOfDay = selectedDate.startOf('day').set('hour', startH).set('minute', startM);
+    const endOfDay = selectedDate.startOf('day').set('hour', endH).set('minute', endM);
     
+    // Fetch bookings (exclude cancelled)
     const bookings = await this.prisma.booking.findMany({
       where: {
         barberId,
+        status: { in: ['reserved', 'completed'] },
         startTime: {
-          gte: startOfDay.toDate(),
-          lt: dayjs(date).endOf('day').toDate(),
+          gte: selectedDate.startOf('day').toDate(),
+          lt: selectedDate.endOf('day').toDate(),
+        },
+      },
+    });
+
+    // Fetch blocked slots
+    const blockedSlots = await this.prisma.blockedSlot.findMany({
+      where: {
+        startTime: {
+          lt: selectedDate.endOf('day').toDate(),
+        },
+        endTime: {
+          gt: selectedDate.startOf('day').toDate(),
         },
       },
     });
@@ -127,9 +193,15 @@ export class BookingsService {
         return current.isBefore(bEnd) && slotEnd.isAfter(bStart);
       });
 
+      const isBlocked = blockedSlots.some(b => {
+        const bStart = dayjs(b.startTime);
+        const bEnd = dayjs(b.endTime);
+        return current.isBefore(bEnd) && slotEnd.isAfter(bStart);
+      });
+
       slots.push({
         time: current.format('HH:mm'),
-        available: !isBooked,
+        available: !isBooked && !isBlocked,
       });
 
       current = slotEnd;
@@ -137,4 +209,27 @@ export class BookingsService {
 
     return slots;
   }
+
+
+  async update(id: string, data: any) {
+
+    const booking = await this.findOne(id);
+
+    return this.prisma.booking.update({
+      where: { id },
+      data,
+      include: {
+        barber: true,
+        service: true,
+      },
+    });
+  }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    return this.prisma.booking.delete({
+      where: { id },
+    });
+  }
 }
+

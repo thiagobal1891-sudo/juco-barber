@@ -6,6 +6,8 @@ import { BarbersModule } from './modules/barbers/barbers.module';
 import { ServicesModule } from './modules/services/services.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { AdminModule } from './modules/admin/admin.module';
 import appConfig from './config/app.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -28,11 +30,15 @@ import { AppService } from './app.service';
       }),
     }),
     PrismaModule,
+    AuthModule,
+    AdminModule,
     BarbersModule,
     ServicesModule,
     BookingsModule,
     NotificationsModule,
   ],
+
+
   controllers: [AppController],
   providers: [AppService],
 })

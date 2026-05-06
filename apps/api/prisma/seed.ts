@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
 
 async function main() {
   console.log('Seeding database...');
@@ -53,8 +55,42 @@ async function main() {
     });
   }
 
+  // 3. Create Admin User
+  const adminPassword = await bcrypt.hash('admin123', 10);
+  await prisma.user.upsert({
+
+    where: { email: 'admin@barberia.com' },
+    update: {},
+    create: {
+      email: 'admin@barberia.com',
+      password: adminPassword,
+    },
+  });
+
+  // 4. Create Working Hours
+  const workingHours = [];
+  for (let i = 1; i <= 6; i++) { // Monday to Saturday
+    workingHours.push({
+      dayOfWeek: i,
+      startTime: '09:00',
+      endTime: '19:00',
+    });
+  }
+
+  for (const wh of workingHours) {
+    await prisma.workingHours.upsert({
+      where: { id: `wh-${wh.dayOfWeek}` },
+      update: {},
+      create: {
+        id: `wh-${wh.dayOfWeek}`,
+        ...wh,
+      },
+    });
+  }
+
   console.log('Seeding finished.');
 }
+
 
 main()
   .catch((e) => {

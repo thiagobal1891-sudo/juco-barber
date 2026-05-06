@@ -44,6 +44,39 @@ model Service {
   @@map("services")
 }
 
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model WorkingHours {
+  id        String   @id @default(uuid())
+  dayOfWeek Int      // 0-6 (Sunday-Saturday)
+  startTime String   // "HH:mm"
+  endTime   String   // "HH:mm"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("working_hours")
+}
+
+model BlockedSlot {
+  id        String   @id @default(uuid())
+  startTime DateTime
+  endTime   DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("blocked_slots")
+}
+
 model Booking {
   id          String   @id @default(uuid())
   clientName  String
@@ -51,6 +84,7 @@ model Booking {
   clientEmail String?
   startTime   DateTime
   endTime     DateTime
+  status      String   @default("reserved") // reserved, cancelled, completed
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -63,3 +97,4 @@ model Booking {
   @@index([startTime, endTime])
   @@map("bookings")
 }
+
