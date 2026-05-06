@@ -28,9 +28,8 @@ export class BookingsController {
   getAvailability(
     @Query('barberId') barberId: string,
     @Query('date') date: string,
-    @Query('serviceId') serviceId?: string,
   ) {
-    return this.bookingsService.getAvailability(barberId, date, serviceId);
+    return this.bookingsService.getAvailability(barberId, date);
   }
 
   @Get(':id')

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { CreateBookingDto } from './dto/booking.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -6,7 +6,6 @@ import dayjs from 'dayjs';
 
 @Injectable()
 export class BookingsService {
-  private readonly logger = new Logger(BookingsService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
@@ -85,57 +84,58 @@ export class BookingsService {
       throw new ConflictException('This time slot is manually blocked');
     }
 
-    // 3. Check overlapping bookings (Improved: Strict overlap and concurrency check)
+    // 3. Check overlapping bookings
     const overlapping = await this.prisma.booking.findFirst({
       where: {
         barberId: dto.barberId,
         status: { in: ['reserved', 'completed'] },
-        AND: [
-          { startTime: { lt: endTime.toDate() } },
-          { endTime: { gt: startTime.toDate() } }
-        ]
+        OR: [
+          {
+            startTime: {
+              lt: endTime.toDate(),
+            },
+            endTime: {
+              gt: startTime.toDate(),
+            },
+          },
+        ],
       },
     });
 
     if (overlapping) {
-      this.logger.warn(`Conflict detected for barber ${dto.barberId} at ${startTime.toISOString()}`);
       throw new ConflictException('Time slot is already booked');
     }
 
-    try {
-      const booking = await this.prisma.booking.create({
-        data: {
-          clientName: dto.clientName,
-          clientPhone: dto.clientPhone,
-          clientEmail: dto.clientEmail,
-          startTime: startTime.toDate(),
-          endTime: endTime.toDate(),
-          barberId: dto.barberId,
-          serviceId: dto.serviceId,
-          notes: dto.notes,
-        },
-        include: {
-          barber: true,
-          service: true,
-        },
+    const booking = await this.prisma.booking.create({
+
+      data: {
+        clientName: dto.clientName,
+        clientPhone: dto.clientPhone,
+        clientEmail: dto.clientEmail,
+        startTime: startTime.toDate(),
+        endTime: endTime.toDate(),
+        barberId: dto.barberId,
+        serviceId: dto.serviceId,
+        notes: dto.notes,
+      },
+      include: {
+        barber: true,
+        service: true,
+      },
+    });
+
+    // Send notification
+    if (booking.clientEmail) {
+      await this.notifications.sendBookingConfirmation(booking.clientEmail, {
+        clientName: booking.clientName,
+        barberName: booking.barber.name,
+        serviceName: booking.service.name,
+        date: dayjs(booking.startTime).format('DD/MM/YYYY'),
+        time: dayjs(booking.startTime).format('HH:mm'),
       });
-
-      // Send notification
-      if (booking.clientEmail) {
-        await this.notifications.sendBookingConfirmation(booking.clientEmail, {
-          clientName: booking.clientName,
-          barberName: booking.barber.name,
-          serviceName: booking.service.name,
-          date: dayjs(booking.startTime).format('DD/MM/YYYY'),
-          time: dayjs(booking.startTime).format('HH:mm'),
-        });
-      }
-
-      return booking;
-    } catch (error: any) {
-      this.logger.error('Error creating booking', error.stack);
-      throw new ConflictException('Could not create booking. Please try again.');
     }
+
+    return booking;
   }
 
   async getAvailability(barberId: string, date: string, serviceId?: string) {

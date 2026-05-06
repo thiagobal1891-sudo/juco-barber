@@ -132,7 +132,7 @@ export class BookingsService {
       }
 
       return booking;
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Error creating booking', error.stack);
       throw new ConflictException('Could not create booking. Please try again.');
     }

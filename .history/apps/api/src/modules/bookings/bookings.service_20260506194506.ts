@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { CreateBookingDto } from './dto/booking.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -6,7 +6,6 @@ import dayjs from 'dayjs';
 
 @Injectable()
 export class BookingsService {
-  private readonly logger = new Logger(BookingsService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
@@ -85,63 +84,63 @@ export class BookingsService {
       throw new ConflictException('This time slot is manually blocked');
     }
 
-    // 3. Check overlapping bookings (Improved: Strict overlap and concurrency check)
+    // 3. Check overlapping bookings
     const overlapping = await this.prisma.booking.findFirst({
       where: {
         barberId: dto.barberId,
         status: { in: ['reserved', 'completed'] },
-        AND: [
-          { startTime: { lt: endTime.toDate() } },
-          { endTime: { gt: startTime.toDate() } }
-        ]
+        OR: [
+          {
+            startTime: {
+              lt: endTime.toDate(),
+            },
+            endTime: {
+              gt: startTime.toDate(),
+            },
+          },
+        ],
       },
     });
 
     if (overlapping) {
-      this.logger.warn(`Conflict detected for barber ${dto.barberId} at ${startTime.toISOString()}`);
       throw new ConflictException('Time slot is already booked');
     }
 
-    try {
-      const booking = await this.prisma.booking.create({
-        data: {
-          clientName: dto.clientName,
-          clientPhone: dto.clientPhone,
-          clientEmail: dto.clientEmail,
-          startTime: startTime.toDate(),
-          endTime: endTime.toDate(),
-          barberId: dto.barberId,
-          serviceId: dto.serviceId,
-          notes: dto.notes,
-        },
-        include: {
-          barber: true,
-          service: true,
-        },
+    const booking = await this.prisma.booking.create({
+
+      data: {
+        clientName: dto.clientName,
+        clientPhone: dto.clientPhone,
+        clientEmail: dto.clientEmail,
+        startTime: startTime.toDate(),
+        endTime: endTime.toDate(),
+        barberId: dto.barberId,
+        serviceId: dto.serviceId,
+        notes: dto.notes,
+      },
+      include: {
+        barber: true,
+        service: true,
+      },
+    });
+
+    // Send notification
+    if (booking.clientEmail) {
+      await this.notifications.sendBookingConfirmation(booking.clientEmail, {
+        clientName: booking.clientName,
+        barberName: booking.barber.name,
+        serviceName: booking.service.name,
+        date: dayjs(booking.startTime).format('DD/MM/YYYY'),
+        time: dayjs(booking.startTime).format('HH:mm'),
       });
-
-      // Send notification
-      if (booking.clientEmail) {
-        await this.notifications.sendBookingConfirmation(booking.clientEmail, {
-          clientName: booking.clientName,
-          barberName: booking.barber.name,
-          serviceName: booking.service.name,
-          date: dayjs(booking.startTime).format('DD/MM/YYYY'),
-          time: dayjs(booking.startTime).format('HH:mm'),
-        });
-      }
-
-      return booking;
-    } catch (error: any) {
-      this.logger.error('Error creating booking', error.stack);
-      throw new ConflictException('Could not create booking. Please try again.');
     }
+
+    return booking;
   }
 
-  async getAvailability(barberId: string, date: string, serviceId?: string) {
+  async getAvailability(barberId: string, date: string) {
     const selectedDate = dayjs(date);
     const dayOfWeek = selectedDate.day();
-    const now = dayjs();
 
     // Fetch working hours for this day
     const workingHours = await this.prisma.workingHours.findFirst({
@@ -150,13 +149,6 @@ export class BookingsService {
 
     if (!workingHours) {
       return []; // Not working this day
-    }
-
-    // Get service duration if provided, otherwise default to 30 mins
-    let duration = 30;
-    if (serviceId) {
-      const service = await this.prisma.service.findUnique({ where: { id: serviceId } });
-      if (service) duration = service.durationMinutes;
     }
 
     const [startH, startM] = workingHours.startTime.split(':').map(Number);
@@ -192,23 +184,9 @@ export class BookingsService {
     const slots = [];
     let current = startOfDay;
 
-    // Use 15 or 30 minute intervals for slot starts
-    const interval = 30; 
-
     while (current.isBefore(endOfDay)) {
-      const slotEnd = current.add(duration, 'minute');
+      const slotEnd = current.add(30, 'minute');
       
-      // Don't show slots in the past
-      if (current.isBefore(now)) {
-        current = current.add(interval, 'minute');
-        continue;
-      }
-
-      // Check if slot fits within working hours
-      if (slotEnd.isAfter(endOfDay)) {
-        break;
-      }
-
       const isBooked = bookings.some(b => {
         const bStart = dayjs(b.startTime);
         const bEnd = dayjs(b.endTime);
@@ -226,7 +204,7 @@ export class BookingsService {
         available: !isBooked && !isBlocked,
       });
 
-      current = current.add(interval, 'minute');
+      current = slotEnd;
     }
 
     return slots;
