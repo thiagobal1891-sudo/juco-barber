@@ -209,13 +209,13 @@ export class BookingsService {
         break;
       }
 
-      const isBooked = bookings.some((b) => {
+      const isBooked = bookings.some((b: Booking) => {
         const bStart = dayjs(b.startTime);
         const bEnd = dayjs(b.endTime);
         return current.isBefore(bEnd) && slotEnd.isAfter(bStart);
       });
 
-      const isBlocked = blockedSlots.some((b) => {
+      const isBlocked = blockedSlots.some((b: BlockedSlot) => {
         const bStart = dayjs(b.startTime);
         const bEnd = dayjs(b.endTime);
         return current.isBefore(bEnd) && slotEnd.isAfter(bStart);

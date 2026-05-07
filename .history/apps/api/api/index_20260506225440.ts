@@ -2,13 +2,10 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
-
+import serverlessExpress from '@vendia/serverless-express';
 import express from 'express';
-import serverlessExpress from '@codegenie/serverless-express';
 
 const expressApp = express();
-
-let server: any;
 
 async function bootstrap() {
   const app = await NestFactory.create(
@@ -16,21 +13,19 @@ async function bootstrap() {
     new ExpressAdapter(expressApp),
   );
 
-  app.enableCors();
-
   app.setGlobalPrefix('api/v1');
 
   await app.init();
 
-  return serverlessExpress({
-    app: expressApp,
-  });
+  return serverlessExpress({ app: expressApp });
 }
 
+let cachedServer: any;
+
 export default async function handler(req: any, res: any) {
-  if (!server) {
-    server = await bootstrap();
+  if (!cachedServer) {
+    cachedServer = await bootstrap();
   }
 
-  return server(req, res);
+  return cachedServer(req, res);
 }

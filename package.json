@@ -25,8 +25,10 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
+    "@codegenie/serverless-express": "^4.17.1",
     "@nestjs/cli": "^11.0.21",
     "@nestjs/platform-express": "^11.1.19",
+    "express": "^5.2.1",
     "serverless-http": "^4.0.0"
   }
 }

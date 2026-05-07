@@ -3,7 +3,7 @@ import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { CreateBookingDto } from './dto/booking.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import dayjs from 'dayjs';
-import { Booking, BlockedSlot } from '@prisma/client';
+
 @Injectable()
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
@@ -209,13 +209,13 @@ export class BookingsService {
         break;
       }
 
-      const isBooked = bookings.some((b) => {
+      const isBooked = bookings.some((b: any) => {
         const bStart = dayjs(b.startTime);
         const bEnd = dayjs(b.endTime);
         return current.isBefore(bEnd) && slotEnd.isAfter(bStart);
       });
 
-      const isBlocked = blockedSlots.some((b) => {
+      const isBlocked = blockedSlots.some(b => {
         const bStart = dayjs(b.startTime);
         const bEnd = dayjs(b.endTime);
         return current.isBefore(bEnd) && slotEnd.isAfter(bStart);
