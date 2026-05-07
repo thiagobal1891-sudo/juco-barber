@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import express from 'express';
+import * as express from 'express';
 import * as serverless from 'serverless-http';
 
 import { AppModule } from './app.module';

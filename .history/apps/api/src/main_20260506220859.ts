@@ -3,8 +3,8 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import express from 'express';
-import * as serverless from 'serverless-http';
+import * as express from 'express';
+import serverless from 'serverless-http';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -31,12 +31,12 @@ async function bootstrap() {
   );
 
   // Root redirect
-  server.get('/', (req: express.Request, res: express.Response) => {
+  server.get('/', (req, res) => {
     res.redirect(frontendUrl);
   });
 
   // API health check
-  server.get('/api/v1', (req: express.Request, res: express.Response) => {
+  server.get('/api/v1', (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Vaon API is running!',
@@ -85,4 +85,4 @@ async function bootstrap() {
 
 bootstrap();
 
-export default serverless.default(server);
+export default serverless(server);
