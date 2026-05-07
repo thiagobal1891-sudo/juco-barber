@@ -6,7 +6,7 @@
     "build": "prisma generate && npx nest build",
     "start": "node dist/main.js",
     "start:prod": "node dist/main.js",
-    "dev": "nest start --watch",
+    "dev": "npx nest start --watch",
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest",
     "test:e2e": "jest --config jest-e2e.json",
