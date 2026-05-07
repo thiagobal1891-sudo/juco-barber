@@ -28,6 +28,7 @@
     "@codegenie/serverless-express": "^4.17.1",
     "@nestjs/cli": "^11.0.21",
     "@nestjs/platform-express": "^11.1.19",
+    "@supabase/supabase-js": "^2.105.3",
     "express": "^5.2.1",
     "serverless-http": "^4.0.0"
   }
