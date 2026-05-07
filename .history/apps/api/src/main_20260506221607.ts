@@ -2,17 +2,26 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import express from 'express';
+import * as serverless from 'serverless-http';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
+const server = express();
+
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug'],
-  });
+  const app = await NestFactory.create(
+    AppModule,
+    new ExpressAdapter(server),
+    {
+      logger: ['error', 'warn', 'log', 'debug'],
+    },
+  );
 
   const configService = app.get(ConfigService);
 
@@ -22,6 +31,21 @@ async function bootstrap() {
   );
 
   const port = configService.get<number>('PORT', 3001);
+
+  // Root redirect
+  server.get('/', (req: express.Request, res: express.Response) => {
+    res.redirect(frontendUrl);
+  });
+
+  // API health check
+  server.get('/api/v1', (req: express.Request, res: express.Response) => {
+    res.status(200).json({
+      success: true,
+      message: 'Vaon API is running!',
+      portal: `Visit the Landing Page at ${frontendUrl}`,
+      timestamp: new Date().toISOString(),
+    });
+  });
 
   // CORS
   app.enableCors({
@@ -56,11 +80,11 @@ async function bootstrap() {
   // Interceptors
   app.useGlobalInterceptors(new TransformInterceptor());
 
-  await app.listen(port);
+  await app.init();
 
-  logger.log(
-    `🚀 BarberOS API running on http://localhost:${port}/api/v1`,
-  );
+  logger.log('✅ NestJS initialized for Vercel');
 }
 
 bootstrap();
+
+export default serverless.default(server);
