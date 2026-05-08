@@ -19,7 +19,6 @@ export async function createApp() {
     'http://localhost:3000',
   );
 
-  // CORS
   app.enableCors({
     origin: [
       frontendUrl,
@@ -31,10 +30,8 @@ export async function createApp() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  // Prefix
   app.setGlobalPrefix('api/v1');
 
-  // Pipes
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -46,10 +43,7 @@ export async function createApp() {
     }),
   );
 
-  // Filters
   app.useGlobalFilters(new HttpExceptionFilter());
-
-  // Interceptors
   app.useGlobalInterceptors(new TransformInterceptor());
 
   await app.init();
@@ -57,23 +51,13 @@ export async function createApp() {
   return app;
 }
 
-// SOLO LOCAL
-if (process.env.NODE_ENV !== 'production') {
-  async function bootstrap() {
-    const logger = new Logger('Bootstrap');
-
-    const app = await createApp();
-
-    const configService = app.get(ConfigService);
-
-    const port = configService.get<number>('PORT', 3001);
-
-    await app.listen(port);
-
-    logger.log(
-      `🚀 BarberOS API running on http://localhost:${port}/api/v1`,
-    );
-  }
-
-  bootstrap();
+async function bootstrap() {
+  const logger = new Logger('Bootstrap');
+  const app = await createApp();
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>('PORT', 3001);
+  await app.listen(port);
+  logger.log(`🚀 BarberOS API running on http://localhost:${port}/api/v1`);
 }
+
+bootstrap();
