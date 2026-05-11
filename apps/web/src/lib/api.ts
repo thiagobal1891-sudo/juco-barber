@@ -32,5 +32,6 @@ export const fetcher = async <T>(url: string, options?: RequestInit): Promise<T>
   }
 
   const json = await res.json();
-  return json.data !== undefined ? json.data : json;
+  // Always unwrap data if it exists from the backend interceptor
+  return json && typeof json === 'object' && 'data' in json ? json.data : json;
 };
