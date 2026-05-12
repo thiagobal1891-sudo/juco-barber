@@ -1,7 +1,8 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, Logger, INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { IncomingMessage, ServerResponse } from 'http';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -13,21 +14,14 @@ export async function createApp() {
   });
 
   const configService = app.get(ConfigService);
-
-  const frontendUrl = configService.get<string>(
-    'FRONTEND_URL',
-    'http://localhost:3000',
-  );
+  const frontendUrl = configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
 
   app.enableCors({
     origin: (origin, callback) => {
       const allowedOrigins = [
         frontendUrl,
-        'https://TU-FRONTEND.vercel.app', // Mantener como fallback si es necesario
+        'https://TU-FRONTEND.vercel.app',
       ];
-      
-      // Permitir peticiones sin origen (como apps móviles o curl) 
-      // y verificar contra la lista permitida o regex de subdominios
       if (!origin || allowedOrigins.includes(origin) || /\.barberos\.app$/.test(origin)) {
         callback(null, true);
       } else {
@@ -46,9 +40,7 @@ export async function createApp() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
+      transformOptions: { enableImplicitConversion: true },
     }),
   );
 
@@ -56,7 +48,6 @@ export async function createApp() {
   app.useGlobalInterceptors(new TransformInterceptor());
 
   await app.init();
-
   return app;
 }
 
@@ -69,4 +60,16 @@ async function bootstrap() {
   logger.log(`🚀 BarberOS API running on http://localhost:${port}/api/v1`);
 }
 
-bootstrap();
+let cachedApp: INestApplication | null = null;
+
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  if (!cachedApp) {
+    cachedApp = await createApp();
+  }
+  const expressInstance = cachedApp.getHttpAdapter().getInstance();
+  expressInstance(req, res);
+}
+
+if (process.env.VERCEL !== '1') {
+  bootstrap();
+}
